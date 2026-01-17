@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="es" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Productividad</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .note-item {
+      animation: fadeIn 0.3s ease-out;
+    }
+    
+    .timer-digit {
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="h-full">
+  <div id="app" class="h-full w-full overflow-auto" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+   <div class="min-h-full py-8 px-6">
+    <div class="max-w-5xl mx-auto">
+     <h1 id="panel-title" class="text-4xl font-bold text-white mb-8 text-center">Mi Panel de Productividad</h1>
+     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><!-- Clock -->
+      <div class="bg-white rounded-2xl shadow-xl p-8">
+       <h2 class="text-xl font-semibold text-gray-800 mb-4">Current Time</h2>
+       <div id="current-time" class="text-5xl font-bold text-purple-600 timer-digit text-center">
+        00:00:00
+       </div>
+       <div id="current-date" class="text-center text-gray-600 mt-2"></div>
+      </div><!-- Timer -->
+      <div class="bg-white rounded-2xl shadow-xl p-8">
+       <h2 id="timer-label" class="text-xl font-semibold text-gray-800 mb-4">Timer</h2>
+       <div id="timer-display" class="text-5xl font-bold text-purple-600 timer-digit text-center mb-6">
+        00:00
+       </div>
+       <div class="flex gap-2 mb-4"><input type="number" id="minutes-input" min="0" max="99" value="25" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Min"> <input type="number" id="seconds-input" min="0" max="59" value="0" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" placeholder="Sec">
+       </div>
+       <div class="flex gap-2"><button id="start-timer" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"> Start </button> <button id="reset-timer" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg transition-colors"> Reset </button>
+       </div>
+      </div>
+     </div><!-- Notes -->
+     <div class="bg-white rounded-2xl shadow-xl p-8">
+      <h2 id="notes-label" class="text-xl font-semibold text-gray-800 mb-4">My Notes</h2>
+      <form id="note-form" class="mb-6"><textarea id="note-input" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none" rows="3" placeholder="Write a note..."></textarea> <button type="submit" class="mt-3 bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"> Add Note </button>
+      </form>
+      <div id="notes-list" class="space-y-3"></div>
+      <div id="notes-empty" class="text-center text-gray-400 py-8">
+       No notes yet. Write your first note!
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+    const defaultConfig = {
+      panel_title: "English Classroom",
+      timer_label: "Timer",
+      notes_label: "My Notes",
+      background_color: "#667eea",
+      surface_color: "#ffffff",
+      text_color: "#1f2937",
+      primary_action_color: "#7c3aed",
+      secondary_action_color: "#e5e7eb",
+      font_family: "system-ui",
+      font_size: 16
+    };
+    
+    let currentNotes = [];
+    let timerInterval = null;
+    let remainingSeconds = 0;
+    let isTimerRunning = false;
+    
+    // Update current time
+    function updateCurrentTime() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const dateString = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      
+      document.getElementById('current-time').textContent = timeString;
+      document.getElementById('current-date').textContent = dateString;
+    }
+    
+    // Actualizar display del temporizador
+    function updateTimerDisplay() {
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      document.getElementById('timer-display').textContent = 
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    // Start/pause timer
+    document.getElementById('start-timer').addEventListener('click', () => {
+      if (isTimerRunning) {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        document.getElementById('start-timer').textContent = 'Continue';
+      } else {
+        if (remainingSeconds === 0) {
+          const minutes = parseInt(document.getElementById('minutes-input').value) || 0;
+          const seconds = parseInt(document.getElementById('seconds-input').value) || 0;
+          remainingSeconds = minutes * 60 + seconds;
+        }
+        
+        if (remainingSeconds > 0) {
+          isTimerRunning = true;
+          document.getElementById('start-timer').textContent = 'Pause';
+          
+          timerInterval = setInterval(() => {
+            remainingSeconds--;
+            updateTimerDisplay();
+            
+            if (remainingSeconds <= 0) {
+              clearInterval(timerInterval);
+              isTimerRunning = false;
+              document.getElementById('start-timer').textContent = 'Start';
+              
+              // Show visual notification
+              const timerDisplay = document.getElementById('timer-display');
+              timerDisplay.style.color = '#ef4444';
+              setTimeout(() => {
+                timerDisplay.style.color = '';
+              }, 2000);
+            }
+          }, 1000);
+        }
+      }
+    });
+    
+    // Reset timer
+    document.getElementById('reset-timer').addEventListener('click', () => {
+      clearInterval(timerInterval);
+      isTimerRunning = false;
+      remainingSeconds = 0;
+      updateTimerDisplay();
+      document.getElementById('start-timer').textContent = 'Start';
+    });
+    
+    // Render notes list
+    function renderNotes() {
+      const notesList = document.getElementById('notes-list');
+      const notesEmpty = document.getElementById('notes-empty');
+      
+      if (currentNotes.length === 0) {
+        notesEmpty.style.display = 'block';
+        notesList.innerHTML = '';
+        return;
+      }
+      
+      notesEmpty.style.display = 'none';
+      notesList.innerHTML = '';
+      
+      currentNotes.forEach(note => {
+        const noteElement = document.createElement('div');
+        noteElement.className = 'note-item bg-gray-50 rounded-lg p-4 flex justify-between items-start gap-4';
+        noteElement.dataset.noteId = note.__backendId;
+        
+        const noteContent = document.createElement('p');
+        noteContent.className = 'text-gray-800 flex-1 whitespace-pre-wrap break-words';
+        noteContent.textContent = note.content;
+        
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'text-red-500 hover:text-red-700 font-medium transition-colors flex-shrink-0';
+        deleteButton.textContent = 'Delete';
+        deleteButton.onclick = async () => {
+          deleteButton.disabled = true;
+          deleteButton.textContent = 'Deleting...';
+          const result = await window.dataSdk.delete(note);
+          if (!result.isOk) {
+            deleteButton.disabled = false;
+            deleteButton.textContent = 'Delete';
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'text-red-600 text-sm mt-2';
+            errorMsg.textContent = 'Error deleting note';
+            noteElement.appendChild(errorMsg);
+            setTimeout(() => errorMsg.remove(), 3000);
+          }
+        };
+        
+        noteElement.appendChild(noteContent);
+        noteElement.appendChild(deleteButton);
+        notesList.appendChild(noteElement);
+      });
+    }
+    
+    // Notes form
+    document.getElementById('note-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const noteInput = document.getElementById('note-input');
+      const content = noteInput.value.trim();
+      
+      if (!content) return;
+      
+      if (currentNotes.length >= 999) {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'text-red-600 text-sm mt-2';
+        errorMsg.textContent = 'Limit of 999 notes reached. Please delete some notes first.';
+        document.getElementById('note-form').appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 3000);
+        return;
+      }
+      
+      const submitButton = e.target.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Adding...';
+      
+      const result = await window.dataSdk.create({
+        id: Date.now().toString(),
+        content: content,
+        createdAt: new Date().toISOString()
+      });
+      
+      submitButton.disabled = false;
+      submitButton.textContent = 'Add Note';
+      
+      if (result.isOk) {
+        noteInput.value = '';
+      } else {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'text-red-600 text-sm mt-2';
+        errorMsg.textContent = 'Error adding note';
+        document.getElementById('note-form').appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 3000);
+      }
+    });
+    
+    // Data SDK handler
+    const dataHandler = {
+      onDataChanged(data) {
+        currentNotes = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        renderNotes();
+      }
+    };
+    
+    // Element SDK
+    async function onConfigChange(config) {
+      const customFont = config.font_family || defaultConfig.font_family;
+      const baseSize = config.font_size || defaultConfig.font_size;
+      const baseFontStack = 'system-ui, -apple-system, sans-serif';
+      
+      // Apply colors
+      const app = document.getElementById('app');
+      app.style.background = `linear-gradient(135deg, ${config.background_color || defaultConfig.background_color} 0%, ${config.primary_action_color || defaultConfig.primary_action_color} 100%)`;
+      
+      // Apply font and size
+      document.getElementById('panel-title').style.fontFamily = `${customFont}, ${baseFontStack}`;
+      document.getElementById('panel-title').style.fontSize = `${baseSize * 2}px`;
+      document.getElementById('panel-title').textContent = config.panel_title || defaultConfig.panel_title;
+      
+      document.getElementById('timer-label').textContent = config.timer_label || defaultConfig.timer_label;
+      document.getElementById('notes-label').textContent = config.notes_label || defaultConfig.notes_label;
+      
+      document.querySelectorAll('.bg-white').forEach(el => {
+        el.style.backgroundColor = config.surface_color || defaultConfig.surface_color;
+      });
+      
+      document.querySelectorAll('.text-gray-800').forEach(el => {
+        el.style.color = config.text_color || defaultConfig.text_color;
+      });
+      
+      document.querySelectorAll('.bg-purple-600').forEach(el => {
+        el.style.backgroundColor = config.primary_action_color || defaultConfig.primary_action_color;
+      });
+      
+      document.querySelectorAll('.bg-gray-200').forEach(el => {
+        el.style.backgroundColor = config.secondary_action_color || defaultConfig.secondary_action_color;
+      });
+    }
+    
+    function mapToCapabilities(config) {
+      return {
+        recolorables: [
+          {
+            get: () => config.background_color || defaultConfig.background_color,
+            set: (value) => {
+              config.background_color = value;
+              if (window.elementSdk) window.elementSdk.setConfig({ background_color: value });
+            }
+          },
+          {
+            get: () => config.surface_color || defaultConfig.surface_color,
+            set: (value) => {
+              config.surface_color = value;
+              if (window.elementSdk) window.elementSdk.setConfig({ surface_color: value });
+            }
+          },
+          {
+            get: () => config.text_color || defaultConfig.text_color,
+            set: (value) => {
+              config.text_color = value;
+              if (window.elementSdk) window.elementSdk.setConfig({ text_color: value });
+            }
+          },
+          {
+            get: () => config.primary_action_color || defaultConfig.primary_action_color,
+            set: (value) => {
+              config.primary_action_color = value;
+              if (window.elementSdk) window.elementSdk.setConfig({ primary_action_color: value });
+            }
+          },
+          {
+            get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
+            set: (value) => {
+              config.secondary_action_color = value;
+              if (window.elementSdk) window.elementSdk.setConfig({ secondary_action_color: value });
+            }
+          }
+        ],
+        borderables: [],
+        fontEditable: {
+          get: () => config.font_family || defaultConfig.font_family,
+          set: (value) => {
+            config.font_family = value;
+            if (window.elementSdk) window.elementSdk.setConfig({ font_family: value });
+          }
+        },
+        fontSizeable: {
+          get: () => config.font_size || defaultConfig.font_size,
+          set: (value) => {
+            config.font_size = value;
+            if (window.elementSdk) window.elementSdk.setConfig({ font_size: value });
+          }
+        }
+      };
+    }
+    
+    function mapToEditPanelValues(config) {
+      return new Map([
+        ["panel_title", config.panel_title || defaultConfig.panel_title],
+        ["timer_label", config.timer_label || defaultConfig.timer_label],
+        ["notes_label", config.notes_label || defaultConfig.notes_label]
+      ]);
+    }
+    
+    // Initialize
+    async function init() {
+      updateCurrentTime();
+      setInterval(updateCurrentTime, 1000);
+      updateTimerDisplay();
+      
+      const initResult = await window.dataSdk.init(dataHandler);
+      if (!initResult.isOk) {
+        console.error("Error initializing Data SDK");
+      }
+      
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange,
+          mapToCapabilities,
+          mapToEditPanelValues
+        });
+      }
+    }
+    
+    init();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bf5733a47dccbba',t:'MTc2ODY0ODY4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
